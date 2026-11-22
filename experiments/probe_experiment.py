@@ -48,7 +48,7 @@ def mean_cost(table, keys):
 
 
 def run_trial(make_table, alphas, rng):
-    """테이블 하나를 채워 가며 적재율마다 (성공 평균, 실패 평균)을 잰다."""
+    """테이블 하나를 채워 가며 적재율마다 (성공 평균, 실패 평균)을 잰다. 넣은 키도 함께 돌려준다."""
     table = make_table()
     keys = []
     rows = []
@@ -59,7 +59,7 @@ def run_trial(make_table, alphas, rng):
             keys.append(url)
         misses = [fresh_url(rng, table) for _ in range(MISSES)]
         rows.append((mean_cost(table, keys), mean_cost(table, misses)))
-    return rows
+    return rows, keys
 
 
 def average(trials):
@@ -74,7 +74,7 @@ def chaining_theory(alpha):
 
 def main():
     rng = random.Random(SEED)
-    trials = [run_trial(lambda: HashTable(capacity=M, max_load=None), ALPHAS, rng)
+    trials = [run_trial(lambda: HashTable(capacity=M, max_load=None), ALPHAS, rng)[0]
               for _ in range(TRIALS)]
     measured = average(trials)
 

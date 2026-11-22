@@ -13,8 +13,10 @@ from server import make_server
 
 
 class ServerTests(unittest.TestCase):
+    table = "chaining"   # test_linear_probing.py가 "linear"로 바꿔 한 번 더 돌린다
+
     def setUp(self):
-        self.server = make_server(port=0, host="127.0.0.1", quiet=True)
+        self.server = make_server(port=0, host="127.0.0.1", table=self.table, quiet=True)
         self.port = self.server.server_port
         # 기본 poll_interval(0.5초)이면 테스트마다 끄는 데 0.5초씩 걸린다
         self.thread = threading.Thread(target=self.server.serve_forever, args=(0.01,), daemon=True)
