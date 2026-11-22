@@ -32,16 +32,16 @@ class Shortener:
     def __init__(self, start=1):
         if isinstance(start, bool) or not isinstance(start, int) or start < 1:
             raise ValueError("start는 1 이상의 정수여야 한다")
-        self._codes = HashTable()  # URL -> 코드
-        self._urls = HashTable()   # 코드 -> URL
+        self.by_url = HashTable()   # URL -> 코드
+        self.by_code = HashTable()  # 코드 -> URL
         self._next = start
 
     def __len__(self):
-        return len(self._urls)
+        return len(self.by_code)
 
     def shorten(self, url):
         url = clean_url(url)
-        code = self._codes.get(url)
+        code = self.by_url.get(url)
         if code is not None:
             return code
         code = encode(self._next)
@@ -49,10 +49,10 @@ class Shortener:
             self._next += 1
             code = encode(self._next)
         self._next += 1
-        self._codes.put(url, code)
-        self._urls.put(code, url)
+        self.by_url.put(url, code)
+        self.by_code.put(code, url)
         return code
 
     def expand(self, code):
         """원래 URL. 준 적 없는 코드는 None."""
-        return self._urls.get(code)
+        return self.by_code.get(code)
