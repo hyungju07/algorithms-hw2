@@ -1,14 +1,19 @@
 """SPEC.md 6절 46~52번. 빈 포트에 서버를 띄우고 실제로 요청을 보낸다."""
+import contextlib
 import http.client
+import inspect
+import io
 import os
 import re
 import sys
 import threading
 import unittest
+from unittest import mock
 from urllib.parse import urlencode
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+import server as server_module
 from server import make_server
 
 
@@ -86,6 +91,13 @@ class ServerTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertEqual(self.request("GET", path)[0], 404)
 
+    def test_target_without_leading_slash_is_not_a_code(self):
+        self.shorten("https://a.com")
+        self.assertEqual(self.request("GET", "/1")[0], 302)
+        for target in ("x1", "Z1?q", "1"):
+            with self.subTest(target=target):
+                self.assertEqual(self.request("GET", target)[:2], (404, None))
+
     def test_bad_url_is_400_and_keeps_the_form(self):
         for bad in ("ftp://files.example.com", "example.com", "http://a.com/a b", "", "javascript:alert(1)"):
             with self.subTest(bad=bad):
@@ -93,6 +105,8 @@ class ServerTests(unittest.TestCase):
                 self.assertEqual(status, 400)
                 self.assertIn("<form", body)
         self.assertEqual(self.request("GET", "/1")[0], 404)     # 아무것도 저장되지 않았다
+        _, _, body = self.shorten("ftp://files.example.com")          # 무엇이 잘못됐는지 보여 준다
+        self.assertIn('role="alert">http:// 또는 https:// 로 시작하는 주소만 받습니다<', body)
         self.assertEqual(self.shorten("https://a.com")[0], 200)
         self.assertEqual(self.request("GET", "/1")[1], "https://a.com")
 
@@ -103,6 +117,23 @@ class ServerTests(unittest.TestCase):
     def test_too_large_body_is_413(self):
         status, _, _ = self.request("POST", "/shorten", "url=" + "a" * 70000)
         self.assertEqual(status, 413)
+
+    def test_body_limit_is_exactly_64_kib(self):
+        prefix = "url=https://a.com/&pad="
+        self.assertEqual(self.request("POST", "/shorten", prefix + "a" * (65536 - len(prefix)))[0], 200)
+        self.assertEqual(self.request("POST", "/shorten", prefix + "a" * (65537 - len(prefix)))[0], 413)
+
+    def test_body_that_is_not_utf8_is_400(self):
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        try:
+            conn.putrequest("POST", "/shorten")
+            conn.putheader("Content-Type", "application/x-www-form-urlencoded")
+            conn.putheader("Content-Length", "6")
+            conn.endheaders(b"url=\xff\xfe")
+            self.assertEqual(conn.getresponse().status, 400)
+        finally:
+            conn.close()
+        self.assertEqual(self.request("GET", "/")[0], 200)    # 서버는 살아 있다
 
     def test_bad_content_length_is_400(self):
         status, _, _ = self.request("POST", "/shorten", "url=x", headers=(("Content-Length", "abc"),))
@@ -155,6 +186,17 @@ class ServerTests(unittest.TestCase):
         status, _, body = self.shorten("<script>alert(2)</script>")
         self.assertEqual(status, 400)
         self.assertNotIn("<script>alert", body)
+        # 저장된 주소가 나오는 나머지 두 곳: 코드 -> URL 테이블과 302 본문
+        for path in ("/table?which=code", "/1"):
+            with self.subTest(path=path):
+                _, _, body = self.request("GET", path)
+                self.assertNotIn("<script>alert", body)
+                self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", body)
+
+    def test_rejected_input_cannot_break_out_of_the_value_attribute(self):
+        status, _, body = self.shorten('x" onfocus="alert(1)')
+        self.assertEqual(status, 400)
+        self.assertIn('value="x&quot; onfocus=&quot;alert(1)"', body)
 
     # 51
     def test_table_shows_chains_and_horner_steps(self):
@@ -169,8 +211,14 @@ class ServerTests(unittest.TestCase):
         self.assertIn("N = 3", body)
         self.assertIn("M = 11", body)
         self.assertIn("<details", body)
-        # https://github.com 의 호너 계산: 첫 글자 h(104), 0에서 시작
-        self.assertIn("(31 × 0 + 104) mod 11", body)
+        # https://github.com 의 호너 계산: 첫 글자 h(104), 0에서 시작. 마지막 h가 칸 번호다
+        self.assertIn("<td>(31 × 0 + 104) mod 11</td><td>5</td>", body)
+        self.assertIn("마지막 h = 6 → 6번 칸", body)
+        self.assertIn("적재율 0.27", body)             # 3/11
+        if self.table == "chaining":                  # 선형 탐지 화면에는 리스트가 없다
+            self.assertIn("NULL", body)
+            self.assertEqual(body.count("NULL"), 11)   # 칸마다 리스트의 끝
+            self.assertIn("가장 긴 리스트 1", body)
 
     def test_empty_table_page(self):
         status, _, body = self.request("GET", "/table")
@@ -209,6 +257,26 @@ class ServerTests(unittest.TestCase):
         self.assertIn("N = 30", body)
         self.assertEqual(self.request("GET", "/u")[1], "https://example.com/29")   # 30번째 코드는 u
 
+    def test_shortener_is_only_touched_while_holding_the_lock(self):
+        # 동시 요청 테스트는 잠금이 없어도 거의 언제나 통과한다. 잠금을 쥐고 부르는지를 직접 본다
+        seen = []
+        shortener, lock = self.server.shortener, self.server.lock
+
+        def spy(name, real):
+            def wrapper(*args):
+                seen.append((name, lock.locked()))
+                return real(*args)
+            return wrapper
+
+        shortener.shorten = spy("shorten", shortener.shorten)
+        shortener.expand = spy("expand", shortener.expand)
+        with mock.patch.object(server_module, "table_html", spy("table", server_module.table_html)):
+            self.shorten("https://a.com")
+            self.request("GET", "/1")
+            self.request("GET", "/table")
+        self.assertEqual(sorted(frozenset(name for name, _ in seen)), ["expand", "shorten", "table"])
+        self.assertEqual([entry for entry in seen if not entry[1]], [])
+
     def test_concurrent_requests_get_distinct_codes(self):
         codes = []
 
@@ -224,6 +292,35 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(len(codes), 40)
         self.assertEqual(len(sorted(frozenset(codes))), 40)
         self.assertEqual(len(self.server.shortener), 40)
+
+
+class DefaultsTests(unittest.TestCase):
+    """make serve가 쓰는 기본값. 다른 테스트는 모두 host를 직접 준다."""
+
+    def test_make_server_binds_to_all_interfaces_by_default(self):
+        parameters = inspect.signature(make_server).parameters
+        self.assertEqual(parameters["host"].default, "0.0.0.0")
+        self.assertEqual(parameters["port"].default, 8000)
+        self.assertEqual(parameters["table"].default, "chaining")
+
+    def test_main_without_arguments(self):
+        with mock.patch.object(sys, "argv", ["server.py"]), \
+                mock.patch.object(server_module, "make_server") as fake, \
+                contextlib.redirect_stdout(io.StringIO()):
+            fake.return_value.server_port = 8000
+            fake.return_value.serve_forever.side_effect = KeyboardInterrupt
+            server_module.main()
+        fake.assert_called_once_with(8000, "0.0.0.0", "chaining")
+        fake.return_value.server_close.assert_called_once_with()
+
+    def test_main_with_linear_table_and_port(self):
+        with mock.patch.object(sys, "argv", ["server.py", "--port", "8123", "--table", "linear"]), \
+                mock.patch.object(server_module, "make_server") as fake, \
+                contextlib.redirect_stdout(io.StringIO()):
+            fake.return_value.server_port = 8123
+            fake.return_value.serve_forever.side_effect = KeyboardInterrupt
+            server_module.main()
+        fake.assert_called_once_with(8123, "0.0.0.0", "linear")
 
 
 if __name__ == "__main__":

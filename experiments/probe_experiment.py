@@ -7,6 +7,7 @@
     make experiment      # 표를 찍고 results.csv, results.svg를 다시 만든다
 """
 import csv
+import math
 import os
 import random
 import sys
@@ -64,7 +65,8 @@ def run_trial(make_table, alphas, rng):
 
 def average(trials):
     """trials[시행][적재율] = (성공, 실패) 를 적재율별 평균으로 줄인다."""
-    return [tuple(sum(column) / len(column) for column in zip(*at_alpha))
+    # fsum은 어느 파이썬에서나 같은 값을 낸다. 내장 sum은 3.12부터 더하는 방식이 바뀌어 끝자리가 달라진다
+    return [tuple(math.fsum(column) / len(column) for column in zip(*at_alpha))
             for at_alpha in zip(*trials)]
 
 

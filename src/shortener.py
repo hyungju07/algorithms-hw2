@@ -18,7 +18,7 @@ def clean_url(url):
     if len(url) > MAX_URL_LENGTH:
         raise ValueError(f"주소가 너무 깁니다 ({MAX_URL_LENGTH}자까지)")
     for ch in url:
-        if ch.isspace() or ord(ch) < 32 or ord(ch) == 127:
+        if ch.isspace() or ord(ch) < 32 or 127 <= ord(ch) < 160:  # 공백, C0, DEL, C1
             raise ValueError("주소 가운데에 공백이나 제어 문자가 있습니다")
     try:
         parts = urlsplit(url)
