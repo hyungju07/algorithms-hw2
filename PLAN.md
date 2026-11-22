@@ -71,7 +71,24 @@
 - 폼 본문은 `urllib.parse.parse_qsl`로 읽는다. `parse_qs`는 `dict`를 돌려주므로 쓰지 않는다.
 - 화면에 넣는 값은 모두 `html.escape`를 거친다.
 
+## 과제: 선형 탐지 (이슈 #8)
+
+SPEC 7절. 수업과 같은 순서로 한다: 명세 → 테스트 → 구현 → 실험 → 화면.
+
+1. **테스트 먼저**: `tests/test_linear_probing.py`
+   - `HashTableContractTests`를 상속해 `table_class`만 바꾼다. 같은 테스트가 두 테이블에 돈다.
+   - 선형 탐지만의 사례를 더한다: 끝 칸에서 0번 칸으로 넘어가기, 가득 찬 테이블, 들여다본 칸 수.
+   - `ShortenerTests`, `ServerTests`도 상속해 선형 탐지로 한 번 더 돌린다.
+2. **구현**: `src/linear_probing.py`
+   - 탐지 한 곳(`_probe`)에서 칸과 들여다본 칸 수를 함께 구하고 `find`, `put`, 크기 조정이 모두 그것을 쓴다.
+   - 탐지는 많아야 M번 돈다. 가득 찬 테이블에서도 끝난다.
+   - 인자 검사와 다음 칸 수 계산은 `hash_table.py`의 것을 같이 쓴다.
+3. **바꿔 끼우기**: `Shortener(table_class=...)`, `make_server(table=...)`, `--table`, `make serve TABLE=linear`.
+4. **비교 실험**: `experiments/compare_experiment.py`. 6단계의 `run_trial`을 다시 쓴다.
+   같은 시드로 두 테이블을 채우고, 실제로 같은 키가 들어갔는지 확인한 뒤 잰다.
+5. **화면**: `/table`에서 테이블 종류에 따라 그리는 함수를 고른다.
+
 ## 하지 않는 것
 
 - 삭제, 파일 저장, 로그인 (SPEC 7절)
-- 선형 탐지: 수업 뒤 과제(이슈 #8)에서 따로 만든다
+- 선형 탐지의 삭제와 지워짐 표시
