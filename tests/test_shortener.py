@@ -81,6 +81,7 @@ class ShortenerTests(unittest.TestCase):
         s = self.make()
         for bad in ("http://a.com/a b", "http://a.com/a\tb", "http://a.com/a\nb",
                     "http://a .com", "http://a.com/\x00", "http://a.com/\x7f",
+                    "http://a.com/\x1b", "http://a.com/\x80", "http://a.com/\x9f",
                     "http://a.com/a\r\nSet-Cookie: x=1", "http://a.com/a b"):
             with self.subTest(bad=bad):
                 with self.assertRaises(ValueError):
@@ -169,6 +170,15 @@ class ShortenerTests(unittest.TestCase):
                 self.assertEqual(after, encode(n + 1))
                 self.assertIsNone(s.expand(word))
                 self.assertEqual(s.expand(after), "https://b.com")
+                # 건너뛴 뒤에도 번호가 이어진다. 멈춰 있으면 다음 URL이 같은 코드를 받는다
+                self.assertEqual(s.shorten("https://c.com"), encode(n + 2))
+                self.assertEqual(s.expand(after), "https://b.com")
+                self.assertEqual(len(s), 3)
+
+    def test_len_counts_codes_not_serial_numbers(self):
+        s = self.make(start=5)
+        self.assertEqual(s.shorten("https://a.com"), "5")
+        self.assertEqual(len(s), 1)
 
     def test_start_must_be_a_positive_integer(self):
         for bad in (0, -1, 1.5, "1", None):

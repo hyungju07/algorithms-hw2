@@ -14,6 +14,7 @@ import test_server
 import test_shortener
 from hash_table import HashTable, horner
 from linear_probing import LinearProbingHashTable
+from server import longest_cluster, probing_rows
 from shortener import Shortener
 
 
@@ -160,6 +161,12 @@ class LinearProbingTests(unittest.TestCase):
         self.assertEqual(t.slots()[0], ("w", "바뀜"))
         self.assertEqual(len(t), 4)
 
+    def test_slot_with_none_value_is_not_an_empty_slot(self):
+        t = LinearProbingHashTable()
+        t.put("a", None)
+        self.assertEqual(t.slots()[9], ("a", None))
+        self.assertEqual(sum(1 for s in t.slots() if s is not None), 1)
+
     def test_same_keys_same_answers_as_chaining(self):
         chaining, probing = HashTable(), LinearProbingHashTable()
         keys = [f"https://example.com/{i % 150}" for i in range(400)]   # 중복 포함
@@ -208,9 +215,50 @@ class LinearServerTests(test_server.ServerTests):
         self.assertIn("처음 칸 4 → 지금 칸 4 · 들여다본 칸 1", body)
         self.assertIn("처음 칸 4 → 지금 칸 5 · 들여다본 칸 2", body)
         self.assertIn("가장 긴 무리 2", body)
+        self.assertIn("적재율 0.18", body)             # 2/11
+        self.assertIn('<li>4번 칸: <span class="key">https://www.yonsei.ac.kr</span>가 있다. 다음 칸으로.</li>'
+                      "<li>5번 칸: 이 키가 있다. 여기서 멈춘다.</li>", body)
+
+    def test_blocking_key_in_the_probe_path_is_escaped(self):
+        evil = 'http://a.com/<script>alert(1)</script>?q="x"&r=<b>'
+        home = horner(evil, 11)
+        other = next(u for u in (f"https://example.com/{i}" for i in range(1000)) if horner(u, 11) == home)
+        self.shorten(evil)
+        self.shorten(other)              # evil에 막혀 다음 칸으로 간다
+        _, _, body = self.request("GET", "/table")
+        self.assertIn("들여다본 칸 2", body)
+        self.assertNotIn("<script>alert", body)
+        self.assertEqual(body.count("&lt;script&gt;alert(1)&lt;/script&gt;"), 2)   # 제 칸과 막힌 경로
 
     def test_server_really_uses_linear_probing(self):
         self.assertIsInstance(self.server.shortener.by_url, LinearProbingHashTable)
+
+
+class ProbingPageTests(unittest.TestCase):
+    """화면을 그리는 함수를 직접 부른다. 끝 칸을 넘어간 키는 서버 테스트의 URL로는 만들기 어렵다."""
+
+    def test_key_that_wrapped_around_the_end(self):
+        t = LinearProbingHashTable(capacity=11, max_load=None)
+        for key in ("b", "m", "x"):            # 모두 10번(마지막) 칸
+            t.put(key, key.upper())
+        rows, summary, _ = probing_rows(t, "http://h", "url")
+        self.assertEqual(len(rows), 11)
+        self.assertIn("처음 칸 10 → 지금 칸 10 · 들여다본 칸 1", rows[10])
+        self.assertIn("처음 칸 10 → 지금 칸 0 · 들여다본 칸 2", rows[0])
+        self.assertIn("처음 칸 10 → 지금 칸 1 · 들여다본 칸 3", rows[1])
+        self.assertIn('<li>10번 칸: <span class="key">b</span>가 있다. 다음 칸으로.</li>'
+                      '<li>0번 칸: <span class="key">m</span>가 있다. 다음 칸으로.</li>'
+                      "<li>1번 칸: 이 키가 있다. 여기서 멈춘다.</li>", rows[1])
+        self.assertIn("빈칸", rows[2])
+        self.assertIn("N = 3 · M = 11 · 적재율 0.27 · 가장 긴 무리 3", summary)
+
+    def test_longest_cluster(self):
+        x = ("k", 1)
+        self.assertEqual(longest_cluster([None, None, None]), 0)
+        self.assertEqual(longest_cluster([x, None, x, x, None]), 2)
+        self.assertEqual(longest_cluster([x, x, None, None, x]), 3)   # 끝 칸과 0번 칸은 이어져 있다
+        self.assertEqual(longest_cluster([x, x, x]), 3)               # 가득 차도 M을 넘지 않는다
+        self.assertEqual(longest_cluster([("k", None), None]), 1)     # 값이 None이어도 찬 칸이다
 
 
 class ServerTableChoiceTests(unittest.TestCase):

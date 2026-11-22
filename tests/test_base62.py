@@ -35,7 +35,7 @@ class EncodeTests(unittest.TestCase):
             encode(-1)
 
     def test_non_integer_raises_type_error(self):
-        for bad in (1.5, "7", None, True, [1]):
+        for bad in (1.5, 0.0, "7", None, True, [1]):
             with self.subTest(bad=bad):
                 with self.assertRaises(TypeError):
                     encode(bad)

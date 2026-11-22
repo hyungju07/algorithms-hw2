@@ -4,6 +4,7 @@
 """
 import argparse
 import re
+import socketserver
 import threading
 from html import escape as esc
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -205,7 +206,7 @@ class Handler(BaseHTTPRequestHandler):
                 body = table_html(self.server.shortener, self.base_url(), which)
             self.send_page(200, "해시 테이블", body)
         else:
-            code = path[1:]
+            code = path[1:] if path.startswith("/") else ""  # "x1"의 x를 떼고 1로 읽지 않는다
             url = None
             if CODE.fullmatch(code):
                 with self.server.lock:
@@ -255,6 +256,12 @@ class Handler(BaseHTTPRequestHandler):
 
 class Server(ThreadingHTTPServer):
     request_queue_size = 128  # 기본값 5로는 한꺼번에 몰린 연결을 놓친다
+
+    def server_bind(self):
+        # HTTPServer.server_bind는 socket.getfqdn()으로 호스트 이름을 찾는데, 환경에 따라 수십 초가 걸린다.
+        # 그 이름은 쓰지 않으므로 묶기만 한다.
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
 
 
 TABLES = (("chaining", HashTable), ("linear", LinearProbingHashTable))
