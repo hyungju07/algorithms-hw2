@@ -32,11 +32,11 @@ def clean_url(url):
 
 
 class Shortener:
-    def __init__(self, start=1):
+    def __init__(self, start=1, table_class=HashTable):
         if isinstance(start, bool) or not isinstance(start, int) or start < 1:
             raise ValueError("start는 1 이상의 정수여야 한다")
-        self.by_url = HashTable()   # URL -> 코드
-        self.by_code = HashTable()  # 코드 -> URL
+        self.by_url = table_class()   # URL -> 코드
+        self.by_code = table_class()  # 코드 -> URL
         self._next = start
 
     def __len__(self):
