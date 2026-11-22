@@ -16,7 +16,8 @@ class ServerTests(unittest.TestCase):
     def setUp(self):
         self.server = make_server(port=0, host="127.0.0.1", quiet=True)
         self.port = self.server.server_port
-        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        # 기본 poll_interval(0.5초)이면 테스트마다 끄는 데 0.5초씩 걸린다
+        self.thread = threading.Thread(target=self.server.serve_forever, args=(0.01,), daemon=True)
         self.thread.start()
 
     def tearDown(self):
@@ -28,7 +29,8 @@ class ServerTests(unittest.TestCase):
         """(상태 코드, Location 헤더, 본문 문자열)"""
         conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
         try:
-            conn.putrequest(method, path)
+            # Host를 직접 줄 때는 http.client가 붙이는 Host를 뺀다 (안 그러면 둘이 간다)
+            conn.putrequest(method, path, skip_host=any(name.lower() == "host" for name, _ in headers))
             for name, value in headers:
                 conn.putheader(name, value)
             if body is not None:

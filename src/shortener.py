@@ -20,7 +20,10 @@ def clean_url(url):
     for ch in url:
         if ch.isspace() or ord(ch) < 32 or ord(ch) == 127:
             raise ValueError("주소 가운데에 공백이나 제어 문자가 있습니다")
-    parts = urlsplit(url)  # 대괄호가 안 맞는 주소 등은 여기서 ValueError
+    try:
+        parts = urlsplit(url)
+    except ValueError:  # 대괄호가 안 맞는 주소 등
+        raise ValueError("주소 형식이 잘못되었습니다") from None
     if parts.scheme not in ("http", "https"):
         raise ValueError("http:// 또는 https:// 로 시작하는 주소만 받습니다")
     if not parts.hostname:
