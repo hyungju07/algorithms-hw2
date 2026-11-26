@@ -50,7 +50,7 @@ class ShortenerTests(unittest.TestCase):
         for code in ("999", "", "0", "01", "001", "a-b", "가", " 1", "1 ", "2"):
             with self.subTest(code=code):
                 self.assertIsNone(s.expand(code))
-        self.assertEqual(s.expand("1"), "https://www.yonsei.ac.kr")
+        self.assertEqual(s.expand("1"), "https://www.yonsei.ac.kr/")
 
     def test_expand_on_empty_shortener(self):
         self.assertIsNone(self.make().expand("1"))
@@ -93,7 +93,7 @@ class ShortenerTests(unittest.TestCase):
         code = s.shorten("  https://a.com  ")
         self.assertEqual(s.shorten("https://a.com"), code)
         self.assertEqual(s.shorten("\thttps://a.com\n"), code)
-        self.assertEqual(s.expand(code), "https://a.com")
+        self.assertEqual(s.expand(code), "https://a.com/")
         self.assertEqual(len(s), 1)
 
     # 38
@@ -132,19 +132,102 @@ class ShortenerTests(unittest.TestCase):
         self.assertEqual(len(s), 2)
 
     # 41
-    def test_uppercase_scheme_is_accepted_but_not_normalized(self):
+    def test_scheme_and_host_are_lowercased(self):
         s = self.make()
         upper = s.shorten("HTTP://EXAMPLE.COM")
-        lower = s.shorten("http://example.com")
-        self.assertNotEqual(upper, lower)
-        self.assertEqual(s.expand(upper), "HTTP://EXAMPLE.COM")
-        self.assertEqual(s.shorten("HttpS://Example.com/Path"), "3")
+        self.assertEqual(s.shorten("http://example.com"), upper)
+        self.assertEqual(s.shorten("Http://Example.Com/"), upper)
+        self.assertEqual(s.expand(upper), "http://example.com/")
+        self.assertEqual(len(s), 1)
+        mixed = s.shorten("HttpS://Example.com/Path")
+        self.assertEqual(mixed, "2")
+        self.assertEqual(s.expand(mixed), "https://example.com/Path")   # 경로의 대문자는 그대로
 
     # 42
-    def test_trailing_slash_is_a_different_url(self):
+    def test_missing_path_becomes_a_slash(self):
         s = self.make()
-        self.assertNotEqual(s.shorten("http://a.com"), s.shorten("http://a.com/"))
-        self.assertEqual(len(s), 2)
+        self.assertEqual(s.shorten("http://a.com"), s.shorten("http://a.com/"))
+        self.assertEqual(len(s), 1)
+        self.assertEqual(s.expand("1"), "http://a.com/")
+        self.assertNotEqual(s.shorten("http://a.com/x"), s.shorten("http://a.com/x/"))   # 경로 끝의 /는 다른 주소
+        self.assertEqual(len(s), 3)
+
+    # 43-1
+    def test_default_port_is_dropped(self):
+        s = self.make()
+        for same in (("http://a.com:80/x", "http://a.com/x"),
+                     ("https://a.com:443", "https://a.com/"),
+                     ("HTTP://A.com:80", "http://a.com/"),
+                     ("http://a.com:/y", "http://a.com/y"),
+                     ("http://[::1]:80/", "http://[::1]/"),
+                     ("https://user:pw@a.com:443/z", "https://user:pw@a.com/z")):
+            with self.subTest(same=same):
+                code = s.shorten(same[0])
+                self.assertEqual(s.shorten(same[1]), code)
+                self.assertEqual(s.expand(code), same[1])
+        kept = ("http://a.com:443/", "https://a.com:80/", "http://a.com:8080/", "http://a.com:8/",
+                "http://a.com:080/", "http://a.com/x:80")
+        codes = [s.shorten(url) for url in kept]
+        self.assertEqual(len(frozenset(codes)), len(kept))
+        for url, code in zip(kept, codes):
+            self.assertEqual(s.expand(code), url)                       # 기본 포트가 아니면 그대로
+        self.assertNotEqual(s.shorten("http://a.com:8080/"), s.shorten("http://a.com/"))
+
+    # 43-2
+    def test_query_or_fragment_right_after_the_host(self):
+        s = self.make()
+        self.assertEqual(s.expand(s.shorten("http://a.com?q=1")), "http://a.com/?q=1")
+        self.assertEqual(s.expand(s.shorten("http://a.com#f")), "http://a.com/#f")
+        self.assertEqual(s.expand(s.shorten("http://A.com:80?Q=1#F")), "http://a.com/?Q=1#F")
+        self.assertEqual(s.shorten("http://a.com/?q=1"), "1")
+        self.assertEqual(len(s), 3)
+
+    # 43-3
+    def test_only_the_host_is_lowercased(self):
+        s = self.make()
+        code = s.shorten("http://User:PW@EXAMPLE.com/Path?Q=A#F")
+        self.assertEqual(s.expand(code), "http://User:PW@example.com/Path?Q=A#F")
+        self.assertNotEqual(s.shorten("http://user:pw@example.com/Path?Q=A#F"), code)   # 사용자 정보는 대소문자를 가린다
+        self.assertNotEqual(s.shorten("http://User:PW@example.com/path?Q=A#F"), code)
+        self.assertEqual(s.expand(s.shorten("HTTP://[FE80::1]/A")), "http://[fe80::1]/A")
+        self.assertEqual(s.expand(s.shorten("http://한글.KR/가")), "http://한글.kr/가")
+
+    # 43-4
+    def test_meaning_changing_normalizations_are_not_done(self):
+        s = self.make()
+        pairs = (("http://a.com/%7Ea", "http://a.com/~a"),
+                 ("http://a.com/a/../b", "http://a.com/b"),
+                 ("http://a.com/?a=1&b=2", "http://a.com/?b=2&a=1"),
+                 ("http://a.com/%2f", "http://a.com/%2F"),
+                 ("http://a.com/p", "http://a.com/p?"),
+                 ("http://a.com/q", "http://a.com/q#"),
+                 ("http://a.com/Index", "http://a.com/index"))
+        for left, right in pairs:
+            with self.subTest(left=left):
+                a, b = s.shorten(left), s.shorten(right)
+                self.assertNotEqual(a, b)
+                self.assertEqual((s.expand(a), s.expand(b)), (left, right))
+        self.assertEqual(len(s), 2 * len(pairs))
+
+    # 43-5
+    def test_other_spellings_do_not_use_serial_numbers(self):
+        s = self.make()
+        spellings = ("https://Example.com", "HTTPS://EXAMPLE.COM/", "https://example.com:443",
+                     "  hTTps://eXample.com:443/  ", "https://example.com/")
+        self.assertEqual([s.shorten(u) for u in spellings], ["1"] * len(spellings))
+        self.assertEqual(len(s), 1)
+        self.assertEqual(s.shorten("https://other.example"), "2")
+        stored = s.expand("1")
+        self.assertEqual(stored, "https://example.com/")
+        self.assertEqual(s.shorten(stored), "1")                         # 맞춘 주소를 다시 넣어도 그대로
+
+    def test_length_is_measured_before_normalizing(self):
+        s = self.make()
+        host_only = "http://" + "a" * (2048 - 7)                         # 2048자, 경로 없음
+        self.assertEqual(len(host_only), 2048)
+        self.assertEqual(s.expand(s.shorten(host_only)), host_only + "/")
+        with self.assertRaises(ValueError):
+            s.shorten("http://" + "a" * (2049 - 7 - 3) + ":80")          # 2049자: 포트를 빼면 줄지만 받지 않는다
 
     # 43
     def test_query_fragment_and_unicode_come_back_unchanged(self):
@@ -169,10 +252,10 @@ class ShortenerTests(unittest.TestCase):
                 self.assertEqual(before, encode(n - 1))
                 self.assertEqual(after, encode(n + 1))
                 self.assertIsNone(s.expand(word))
-                self.assertEqual(s.expand(after), "https://b.com")
+                self.assertEqual(s.expand(after), "https://b.com/")
                 # 건너뛴 뒤에도 번호가 이어진다. 멈춰 있으면 다음 URL이 같은 코드를 받는다
                 self.assertEqual(s.shorten("https://c.com"), encode(n + 2))
-                self.assertEqual(s.expand(after), "https://b.com")
+                self.assertEqual(s.expand(after), "https://b.com/")
                 self.assertEqual(len(s), 3)
 
     def test_len_counts_codes_not_serial_numbers(self):
