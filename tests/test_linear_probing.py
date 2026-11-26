@@ -3,6 +3,7 @@
 M = 11에서 한 글자 키의 칸: a, l, w, V, K는 9번, b, m, x는 10번, c는 0번, d는 1번, e는 2번.
 """
 import os
+import re
 import sys
 import unittest
 
@@ -14,7 +15,7 @@ import test_server
 import test_shortener
 from hash_table import HashTable, horner
 from linear_probing import LinearProbingHashTable
-from server import longest_cluster, probing_rows
+from server import chaining_rows, longest_cluster, probing_rows
 from shortener import Shortener
 
 
@@ -96,6 +97,12 @@ class LinearProbingTests(unittest.TestCase):
         self.assertEqual(t.get("q"), "바뀜")
         self.assertEqual(len(t), 4)
         self.assertEqual(t.capacity, 4)
+        # 탐지가 M칸째까지 가는 경우: d, h, l, p는 M = 4에서 모두 0번 칸이다
+        u = LinearProbingHashTable(capacity=4, max_load=None)
+        for i, key in enumerate(("d", "h", "l", "p")):
+            u.put(key, i)
+        self.assertEqual(u.slots(), [("d", 0), ("h", 1), ("l", 2), ("p", 3)])
+        self.assertEqual(u.find("p"), (True, 3, 4))
 
     def test_full_table_of_one(self):
         t = LinearProbingHashTable(capacity=1, max_load=None)
@@ -277,6 +284,18 @@ class ServerTableChoiceTests(unittest.TestCase):
             self.assertIsInstance(server.shortener.by_url, HashTable)
         finally:
             server.server_close()
+        # 같은 칸에 떨어진 키는 한 리스트로 그려진다: 머리부터 화살표로 잇고 NULL로 끝난다
+        t = HashTable(capacity=11, max_load=None)
+        for key in ("a", "l", "w"):                     # 모두 9번 칸
+            t.put(key, key.upper())
+        rows, summary, _ = chaining_rows(t, "http://h", "url")
+        self.assertEqual(len(rows), 11)
+        marks = r'<span class="(key|arrow|null)">([^<]*)</span>'
+        self.assertEqual(re.findall(marks, rows[9]),
+                         [("key", "w"), ("arrow", "→"), ("key", "l"), ("arrow", "→"),
+                          ("key", "a"), ("arrow", "→"), ("null", "NULL")])
+        self.assertEqual(re.findall(marks, rows[0]), [("null", "NULL")])
+        self.assertIn("개별 체이닝 · N = 3 · M = 11 · 적재율 0.27 · 가장 긴 리스트 3", summary)
 
     def test_unknown_table_name_raises_value_error(self):
         with self.assertRaises(ValueError):

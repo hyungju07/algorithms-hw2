@@ -20,6 +20,10 @@
 
 외부 라이브러리는 쓰지 않습니다. Python 3 표준 모듈만으로 돕니다.
 서버를 띄운 뒤 브라우저에서 `/`에 URL을 넣으면 짧은 링크가 나오고, `/table`에서 해시 테이블 안을 볼 수 있습니다.
+선형 탐지 화면도 `make serve TABLE=linear`로 띄운 같은 `/table`입니다. 두 방식을 나란히 보려면 한쪽을 `PORT=8001`로 띄웁니다.
+
+충돌을 보려면 `https://www.yonsei.ac.kr`, `https://library.yonsei.ac.kr`, `https://learnus.yonsei.ac.kr`을 차례로 넣습니다 (M = 11).
+앞의 둘이 6번 칸에서 만나, 체이닝은 한 리스트로 잇고 선형 탐지는 뒤의 것을 7번 칸으로, 7번이 제 칸인 셋째를 8번 칸으로 밉니다.
 
 ## 들어 있는 것
 
@@ -33,7 +37,9 @@
 | `tests/` | `unittest` 테스트. 같은 테스트를 두 테이블에 모두 돌림 |
 | `experiments/probe_experiment.py` | 체이닝: 적재율 0.25~4의 탐색 비용 → `results.csv`, `results.svg` |
 | `experiments/compare_experiment.py` | 두 방식 비교: 적재율 0.1~0.9 → `compare.csv`, `compare.svg`, `compare_log.svg` |
+| `experiments/svgplot.py` | 외부 라이브러리 없이 SVG 꺾은선 그래프 그리기 |
 | `.github/copilot-instructions.md` | 에이전트가 매번 읽는 저장소 규칙 |
+| `CLAUDE.md` | 에이전트로 쓴 Claude Code가 위 규칙 파일을 읽게 하는 한 줄 |
 
 `src/` 안에서는 `dict`, `set`, 내장 `hash()`를 쓰지 않습니다. `tests/test_rules.py`가 검사합니다.
 
@@ -62,7 +68,9 @@ https://Example.com      HTTPS://EXAMPLE.COM/      https://example.com:443      
 ## 실험 결과
 
 같은 무작위 URL을 같은 크기(M = 4093)의 두 테이블에 넣고 50번 평균을 냈습니다.
-체이닝은 비교한 노드 수, 선형 탐지는 들여다본 칸 수입니다. 괄호 안은 이론값입니다.
+체이닝은 비교한 노드 수, 선형 탐지는 들여다본 칸 수입니다. 괄호 안은 이론값이고, ±는 50번 평균의 표준오차입니다.
+선형 탐지의 이론값은 테이블이 아주 클 때의 근삿값입니다. 적재율 0.90에서 이 크기(M = 4093, N = 3684)의 정확한 기댓값은 47.6입니다
+(`compare.csv`의 `probing_miss_exact`).
 
 | 적재율 | 체이닝 성공 | 체이닝 실패 | 선형 탐지 성공 | 선형 탐지 실패 |
 | --- | --- | --- | --- | --- |
@@ -75,7 +83,9 @@ https://Example.com      HTTPS://EXAMPLE.COM/      https://example.com:443      
 
 전체 숫자는 [experiments/compare.csv](experiments/compare.csv), 로그 눈금 그래프는
 [experiments/compare_log.svg](experiments/compare_log.svg), 체이닝만 적재율 4까지 잰 것은
-[experiments/results.svg](experiments/results.svg)에 있습니다. 시드를 고정해 다시 돌려도 같은 숫자가 나옵니다.
+아래 그림에 있습니다. 시드를 고정해 다시 돌려도 같은 숫자가 나옵니다.
+
+![개별 체이닝의 탐색 비용 (적재율 0.25~4)](experiments/results.svg)
 
 ## Codespaces에서 휴대폰으로 열기
 
@@ -93,4 +103,5 @@ docker compose up -d
 docker compose exec lab bash
 ```
 
-Python 3.9 이상이 있으면 컨테이너 없이 `make test`를 바로 돌려도 됩니다.
+Python 3.9 이상이 있으면 컨테이너 없이 `make test`, `make serve`를 바로 돌려도 됩니다.
+`compose.yml`은 포트를 내보내지 않으므로, 브라우저로 볼 때는 컨테이너 밖에서 `make serve`를 띄우거나 Codespaces를 씁니다.
