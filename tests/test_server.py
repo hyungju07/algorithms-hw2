@@ -160,6 +160,10 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 400)
         status, _, _ = self.request("POST", "/shorten", "url=x", headers=(("Content-Length", "-5"),))
         self.assertEqual(status, 400)
+        for length in ("+17", "1_7"):                  # int()는 받지만 HTTP의 길이는 ASCII 숫자뿐이다
+            status, _, _ = self.request("POST", "/shorten", "url=https://a.com",
+                                        headers=(("Content-Length", length),))
+            self.assertEqual(status, 400, length)
 
     def test_post_to_other_path_is_404(self):
         self.assertEqual(self.request("POST", "/", "url=https://a.com")[0], 404)
@@ -251,6 +255,7 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn("https://github.com", body)
         self.assertIn("(31 × 0 + 49) mod 11", body)   # 키 "1"의 글자 코드는 49
+        self.assertIn(f'href="{self.me()}/1"', body)   # 짧은 링크는 값(URL)이 아니라 키(코드)로 만든다
 
     # 52
     def test_reserved_paths_are_not_codes(self):
@@ -265,6 +270,9 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(self.request("GET", "/1")[1],
                          "https://ko.wikipedia.org/wiki/%ED%95%B4%EC%8B%9C_%ED%85%8C%EC%9D%B4%EB%B8%94")
         self.assertEqual(self.request("GET", "/2")[1], "https://example.com/a%20b?x=1&y=%ED%95%9C#frag")
+        plain = "http://user:pw@[::1]:8000/@a;b,c!$'()*+~?q=x+y"   # 뜻이 있는 글자는 그대로 보낸다
+        self.shorten(plain)
+        self.assertEqual(self.request("GET", "/3")[1], plain)
 
     def test_code_path_ignores_query_string(self):
         self.shorten("https://a.com")

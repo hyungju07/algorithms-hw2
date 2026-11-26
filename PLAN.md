@@ -10,8 +10,11 @@
 | `src/base62.py` | `encode`, `decode` (1단계에서 끝남) | 없음 |
 | `src/hash_table.py` | `horner`, `horner_steps`, `HashTable` | 없음 |
 | `src/shortener.py` | `Shortener` | `base62`, `hash_table` |
-| `src/server.py` | `http.server` 웹 서버 | `shortener`, `hash_table` |
-| `experiments/probe_experiment.py` | 적재율 실험 | `hash_table` |
+| `src/server.py` | `http.server` 웹 서버 | `shortener`, `hash_table`, `linear_probing` |
+| `experiments/probe_experiment.py` | 적재율 실험 | `hash_table`, `svgplot` |
+| `src/linear_probing.py` | `LinearProbingHashTable` (과제) | `hash_table` |
+| `experiments/compare_experiment.py` | 두 방식 비교 실험 (과제) | `probe_experiment`, `linear_probing`, `svgplot` |
+| `experiments/svgplot.py` | SVG 그래프 그리기 | 없음 |
 
 ## 순서
 
@@ -55,7 +58,7 @@
 
 - `.github/copilot-instructions.md`에 저장소 규칙을 적는다.
 - `tests/test_rules.py`: `src/*.py`를 `ast`로 읽어 `dict`·`set`·`hash` 이름, `{}` 리터럴,
-  컴프리헨션, `collections` 가져오기가 없는지 검사한다. grep보다 정확하고 `make test`에 들어간다.
+  dict·set 컴프리헨션, `collections` 가져오기가 없는지 검사한다. grep보다 정확하고 `make test`에 들어간다.
 
 ### 6. 적재율 실험 (6단계)
 
@@ -66,7 +69,7 @@
 
 ### 7. 웹 서버 (7단계)
 
-- `tests/test_server.py`를 먼저 쓴다 (SPEC 6절의 46~56번). 빈 포트에 서버를 띄워 `urllib`로 요청한다.
+- `tests/test_server.py`를 먼저 쓴다 (SPEC 6절의 46~56번). 빈 포트에 서버를 띄워 `http.client`로 요청한다.
 - `src/server.py`: `GET /`, `POST /shorten`, `GET /<코드>`, `GET /table`.
 - 짧은 링크의 주소는 `X-Forwarded-Host` → `Host` 순서로 정한다.
 - 폼 본문은 `urllib.parse.parse_qsl`로 읽는다. `parse_qs`는 `dict`를 돌려주므로 쓰지 않는다.

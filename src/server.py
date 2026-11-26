@@ -220,10 +220,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path.partition("?")[0] != "/shorten":
             return self.not_found()
-        try:
-            length = int(self.headers.get("Content-Length", ""))
-        except ValueError:
-            length = -1
+        length = self.headers.get("Content-Length", "").strip()
+        # int()는 "+17", "1_7"도 받는다. 길이는 ASCII 숫자만이다
+        length = int(length) if length.isascii() and length.isdigit() else -1
         if length < 0:
             return self.send_page(400, "URL 단축기", form_html(error="요청의 길이를 알 수 없습니다."))
         if length > MAX_BODY:
