@@ -122,15 +122,24 @@ class LinearProbingTests(unittest.TestCase):
         LinearProbingHashTable(max_load=0.99)
 
     # 64
-    def test_default_max_load_is_half(self):
+    def test_default_max_load_is_seven_tenths(self):
         t = LinearProbingHashTable()
-        for i in range(5):
+        self.assertEqual(t.max_load, 0.7)
+        for i in range(7):
             t.put(f"k{i}", i)
-        self.assertEqual(t.capacity, 11)       # 5/11 = 0.45
-        t.put("k5", 5)
-        self.assertEqual(t.capacity, 23)       # 6/11 = 0.55 > 0.5
-        for i in range(6):
+        self.assertEqual(t.capacity, 11)       # 7/11 = 0.64
+        t.put("k7", 7)
+        self.assertEqual(t.capacity, 23)       # 8/11 = 0.73 > 0.7
+        for i in range(8):
             self.assertEqual(t.get(f"k{i}"), i)
+
+    def test_default_table_never_fills_up(self):
+        t = LinearProbingHashTable()
+        for i in range(3000):
+            t.put(f"https://example.com/{i}", i)
+            self.assertLessEqual(t.load_factor, 0.7)
+        self.assertEqual(len(t), 3000)
+        self.assertEqual(t.get("https://example.com/2999"), 2999)
 
     # 65
     def test_no_holes_between_home_slot_and_actual_slot(self):
