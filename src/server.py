@@ -152,7 +152,7 @@ def probing_rows(table, base, which):
 
 
 def table_html(shortener, base, which):
-    # ponytail: 모든 칸과 모든 계산 표를 한 번에 그린다. URL이 수천 개를 넘으면 쪽을 나눈다.
+    # 모든 칸과 모든 계산 표를 한 번에 그린다. URL이 수천 개를 넘으면 쪽을 나눠야 한다.
     table = shortener.by_code if which == "code" else shortener.by_url
     draw = probing_rows if isinstance(table, LinearProbingHashTable) else chaining_rows
     rows, summary, help_text = draw(table, base, which)
