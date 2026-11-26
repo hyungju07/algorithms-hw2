@@ -66,7 +66,7 @@
 
 ### 7. 웹 서버 (7단계)
 
-- `tests/test_server.py`를 먼저 쓴다 (SPEC 6절의 46~52번). 빈 포트에 서버를 띄워 `urllib`로 요청한다.
+- `tests/test_server.py`를 먼저 쓴다 (SPEC 6절의 46~56번). 빈 포트에 서버를 띄워 `urllib`로 요청한다.
 - `src/server.py`: `GET /`, `POST /shorten`, `GET /<코드>`, `GET /table`.
 - 짧은 링크의 주소는 `X-Forwarded-Host` → `Host` 순서로 정한다.
 - 폼 본문은 `urllib.parse.parse_qsl`로 읽는다. `parse_qs`는 `dict`를 돌려주므로 쓰지 않는다.
@@ -91,5 +91,5 @@ SPEC 7절. 수업과 같은 순서로 한다: 명세 → 테스트 → 구현 �
 
 ## 하지 않는 것
 
-- 삭제, 파일 저장, 로그인 (SPEC 7절)
+- 삭제, 파일 저장, 로그인 (SPEC 8절)
 - 선형 탐지의 삭제와 지워짐 표시
