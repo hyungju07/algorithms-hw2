@@ -89,6 +89,15 @@ class ServerTests(unittest.TestCase):
         _, _, table = self.request("GET", "/table")
         self.assertIn("N = 1", table)
 
+    def test_address_read_differently_by_browsers_is_rejected(self):
+        # 브라우저는 a.com으로, 파이썬은 evil.example로 읽는 주소
+        for bad in ("http://a.com\\@evil.example/", "http://a.com:80:80/", "http://a.com:abc/"):
+            with self.subTest(bad=bad):
+                status, _, body = self.shorten(bad)
+                self.assertEqual(status, 400)
+                self.assertIn('role="alert"', body)
+        self.assertEqual(self.request("GET", "/1")[0], 404)
+
     def test_same_url_gets_the_same_link(self):
         self.shorten("https://www.yonsei.ac.kr")
         self.shorten("https://github.com")
