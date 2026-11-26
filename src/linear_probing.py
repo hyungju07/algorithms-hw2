@@ -5,7 +5,7 @@ from hash_table import check_sizes, horner, next_capacity
 class LinearProbingHashTable:
     """충돌하면 다음 칸을 보는 해시 테이블. 마지막 칸 다음은 0번 칸이다. 키는 문자열."""
 
-    def __init__(self, capacity=11, max_load=0.5):
+    def __init__(self, capacity=11, max_load=0.7):
         check_sizes(capacity, max_load)
         if max_load is not None and max_load >= 1:
             raise ValueError("선형 탐지의 max_load는 1보다 작아야 한다")
