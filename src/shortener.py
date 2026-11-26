@@ -9,7 +9,7 @@ RESERVED = ("table", "shorten")  # 서버 경로와 겹치는 코드
 
 
 def clean_url(url):
-    """앞뒤 공백을 자른 URL을 돌려준다. 받을 수 없는 주소면 ValueError."""
+    """앞뒤 공백을 자르고 한 모양으로 맞춘 URL을 돌려준다. 받을 수 없는 주소면 ValueError."""
     if not isinstance(url, str):
         raise TypeError("URL은 문자열이어야 한다")
     url = url.strip()
@@ -28,7 +28,33 @@ def clean_url(url):
         raise ValueError("http:// 또는 https:// 로 시작하는 주소만 받습니다")
     if not parts.hostname:
         raise ValueError("주소에 호스트가 없습니다")
-    return url
+    return normalize(url)
+
+
+def normalize(url):
+    """같은 곳을 가리키는 주소를 한 모양으로 맞춘다. clean_url의 검사를 통과한 주소만 받는다.
+
+    스킴과 호스트는 소문자로, 기본 포트는 빼고, 경로가 없으면 /를 붙인다.
+    경로·쿼리·# 뒤·사용자 정보는 뜻이 바뀔 수 있어 건드리지 않는다.
+    """
+    scheme, _, rest = url.partition("://")
+    scheme = scheme.lower()
+    end = len(rest)  # 호스트 부분은 /, ?, # 중 가장 먼저 나오는 것 앞까지다
+    for mark in "/?#":
+        at = rest.find(mark)
+        if 0 <= at < end:
+            end = at
+    userinfo, at_sign, hostport = rest[:end].rpartition("@")
+    hostport = hostport.lower()
+    default_port = ":80" if scheme == "http" else ":443"
+    if hostport.endswith(default_port):
+        hostport = hostport[:-len(default_port)]
+    elif hostport.endswith(":"):  # 번호 없는 포트
+        hostport = hostport[:-1]
+    tail = rest[end:]
+    if not tail.startswith("/"):
+        tail = "/" + tail
+    return f"{scheme}://{userinfo}{at_sign}{hostport}{tail}"
 
 
 class Shortener:
