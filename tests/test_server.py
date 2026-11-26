@@ -1,4 +1,4 @@
-"""SPEC.md 6절 46~52번. 빈 포트에 서버를 띄우고 실제로 요청을 보낸다."""
+"""SPEC.md 6절 46~56번. 빈 포트에 서버를 띄우고 실제로 요청을 보낸다."""
 import contextlib
 import http.client
 import inspect
