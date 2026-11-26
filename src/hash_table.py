@@ -65,7 +65,7 @@ class _Node:
 class HashTable:
     """칸마다 단일 연결 리스트를 두는 해시 테이블. 키는 문자열."""
 
-    def __init__(self, capacity=11, max_load=0.75):
+    def __init__(self, capacity=11, max_load=1.0):
         check_sizes(capacity, max_load)
         self.capacity = capacity
         self.max_load = max_load
