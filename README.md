@@ -6,7 +6,7 @@
 
 - 과제 안내: [lec-algorithm.github.io/lecture/article/hw2-2026](https://lec-algorithm.github.io/lecture/article/hw2-2026/)
 - 무엇을 만드는지: [SPEC.md](SPEC.md) · 어떤 순서로 만들었는지: [PLAN.md](PLAN.md)
-- 단계별 기록: [이슈 #1~#8](../../issues?q=is%3Aissue)
+- 단계별 기록: [이슈 #1~#9](../../issues?q=is%3Aissue) (#9는 검증)
 
 ## 명령
 
