@@ -250,7 +250,7 @@ class Handler(BaseHTTPRequestHandler):
         link = esc(f"{self.base_url()}/{code}")
         self.send_page(200, "짧은 링크가 만들어졌습니다",
                        f'<p class="short"><a href="{link}">{link}</a></p>'
-                       f'<p>원래 주소: <span class="url">{esc(url)}</span></p>'
+                       f'<p>저장된 주소: <span class="url">{esc(url)}</span></p>'
                        '<p><a href="/">다른 주소 줄이기</a> · <a href="/table">해시 테이블 보기</a></p>')
 
 

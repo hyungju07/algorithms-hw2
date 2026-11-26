@@ -201,9 +201,9 @@ class LinearServerTests(test_server.ServerTests):
     table = "linear"
 
     def test_table_page_shows_slots_and_probes(self):
-        # M = 11에서 두 주소 모두 4번 칸이다. 둘째는 5번 칸으로 밀린다.
-        self.assertEqual(horner("https://www.yonsei.ac.kr", 11), 4)
-        self.assertEqual(horner("https://library.yonsei.ac.kr", 11), 4)
+        # 저장되는 키는 끝에 /가 붙는다. M = 11에서 둘 다 6번 칸이고, 둘째는 7번 칸으로 밀린다.
+        self.assertEqual(horner("https://www.yonsei.ac.kr/", 11), 6)
+        self.assertEqual(horner("https://library.yonsei.ac.kr/", 11), 6)
         self.shorten("https://www.yonsei.ac.kr")
         self.shorten("https://library.yonsei.ac.kr")
         status, _, body = self.request("GET", "/table")
@@ -212,12 +212,12 @@ class LinearServerTests(test_server.ServerTests):
         self.assertNotIn("개별 체이닝", body)
         self.assertIn("빈칸", body)
         self.assertNotIn("NULL", body)
-        self.assertIn("처음 칸 4 → 지금 칸 4 · 들여다본 칸 1", body)
-        self.assertIn("처음 칸 4 → 지금 칸 5 · 들여다본 칸 2", body)
+        self.assertIn("처음 칸 6 → 지금 칸 6 · 들여다본 칸 1", body)
+        self.assertIn("처음 칸 6 → 지금 칸 7 · 들여다본 칸 2", body)
         self.assertIn("가장 긴 무리 2", body)
         self.assertIn("적재율 0.18", body)             # 2/11
-        self.assertIn('<li>4번 칸: <span class="key">https://www.yonsei.ac.kr</span>가 있다. 다음 칸으로.</li>'
-                      "<li>5번 칸: 이 키가 있다. 여기서 멈춘다.</li>", body)
+        self.assertIn('<li>6번 칸: <span class="key">https://www.yonsei.ac.kr/</span>가 있다. 다음 칸으로.</li>'
+                      "<li>7번 칸: 이 키가 있다. 여기서 멈춘다.</li>", body)
 
     def test_blocking_key_in_the_probe_path_is_escaped(self):
         evil = 'http://a.com/<script>alert(1)</script>?q="x"&r=<b>'

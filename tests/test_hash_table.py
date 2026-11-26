@@ -242,7 +242,7 @@ class HashTableContractTests(unittest.TestCase):
         self.assertEqual(seen[:5], [11, 23, 47, 97, 197])
 
     def test_capacity_one_grows_to_three(self):
-        t = self.make(capacity=1)
+        t = self.make(capacity=1, max_load=0.5)
         t.put("a", 1)
         self.assertEqual(t.capacity, 3)        # 2*1+1 = 3
         self.assertEqual(t.get("a"), 1)
@@ -311,13 +311,17 @@ class ChainingTests(unittest.TestCase):
         t.put("a", "바뀜")
         self.assertEqual(t.buckets()[9], [("w", 3), ("l", 2), ("a", "바뀜")])
 
-    def test_default_max_load_is_three_quarters(self):
+    def test_default_max_load_is_one(self):
         t = HashTable()
-        for i in range(8):
+        self.assertEqual(t.max_load, 1.0)
+        for i in range(11):
             t.put(f"k{i}", i)
-        self.assertEqual(t.capacity, 11)       # 8/11 = 0.73
-        t.put("k8", 8)
-        self.assertEqual(t.capacity, 23)       # 9/11 = 0.82 > 0.75
+        self.assertEqual(t.capacity, 11)       # 11/11 = 1.0, 넘지 않았다
+        self.assertEqual(t.load_factor, 1.0)
+        t.put("k11", 11)
+        self.assertEqual(t.capacity, 23)       # 12/11 > 1.0
+        for i in range(12):
+            self.assertEqual(t.get(f"k{i}"), i)
 
     # 23
     def test_no_resize_when_max_load_is_none(self):

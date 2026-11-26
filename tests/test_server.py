@@ -76,7 +76,27 @@ class ServerTests(unittest.TestCase):
         self.assertIn("https://www.yonsei.ac.kr", body)
         status, location, _ = self.request("GET", "/1")
         self.assertEqual(status, 302)
-        self.assertEqual(location, "https://www.yonsei.ac.kr")
+        self.assertEqual(location, "https://www.yonsei.ac.kr/")   # 경로가 없으면 /를 붙여 저장한다
+
+    def test_other_spellings_of_one_address_share_a_link(self):
+        _, _, first = self.shorten("https://Example.com")
+        _, _, second = self.shorten("HTTPS://EXAMPLE.COM:443/")
+        for body in (first, second):
+            self.assertIn(f'href="{self.me()}/1"', body)
+            self.assertIn('<span class="url">https://example.com/</span>', body)   # 맞춘 주소를 보여 준다
+        self.assertEqual(self.request("GET", "/1")[1], "https://example.com/")
+        self.assertEqual(self.request("GET", "/2")[0], 404)
+        _, _, table = self.request("GET", "/table")
+        self.assertIn("N = 1", table)
+
+    def test_address_read_differently_by_browsers_is_rejected(self):
+        # 브라우저는 a.com으로, 파이썬은 evil.example로 읽는 주소
+        for bad in ("http://a.com\\@evil.example/", "http://a.com:80:80/", "http://a.com:abc/"):
+            with self.subTest(bad=bad):
+                status, _, body = self.shorten(bad)
+                self.assertEqual(status, 400)
+                self.assertIn('role="alert"', body)
+        self.assertEqual(self.request("GET", "/1")[0], 404)
 
     def test_same_url_gets_the_same_link(self):
         self.shorten("https://www.yonsei.ac.kr")
@@ -108,7 +128,7 @@ class ServerTests(unittest.TestCase):
         _, _, body = self.shorten("ftp://files.example.com")          # 무엇이 잘못됐는지 보여 준다
         self.assertIn('role="alert">http:// 또는 https:// 로 시작하는 주소만 받습니다<', body)
         self.assertEqual(self.shorten("https://a.com")[0], 200)
-        self.assertEqual(self.request("GET", "/1")[1], "https://a.com")
+        self.assertEqual(self.request("GET", "/1")[1], "https://a.com/")
 
     def test_missing_field_is_400(self):
         self.assertEqual(self.request("POST", "/shorten", "other=1")[0], 400)
@@ -211,9 +231,9 @@ class ServerTests(unittest.TestCase):
         self.assertIn("N = 3", body)
         self.assertIn("M = 11", body)
         self.assertIn("<details", body)
-        # https://github.com 의 호너 계산: 첫 글자 h(104), 0에서 시작. 마지막 h가 칸 번호다
+        # 저장된 키 https://github.com/ 의 호너 계산: 첫 글자 h(104), 0에서 시작. 마지막 h가 칸 번호다
         self.assertIn("<td>(31 × 0 + 104) mod 11</td><td>5</td>", body)
-        self.assertIn("마지막 h = 6 → 6번 칸", body)
+        self.assertIn("마지막 h = 2 → 2번 칸", body)
         self.assertIn("적재율 0.27", body)             # 3/11
         if self.table == "chaining":                  # 선형 탐지 화면에는 리스트가 없다
             self.assertIn("NULL", body)
@@ -248,7 +268,7 @@ class ServerTests(unittest.TestCase):
 
     def test_code_path_ignores_query_string(self):
         self.shorten("https://a.com")
-        self.assertEqual(self.request("GET", "/1?utm=x")[1], "https://a.com")
+        self.assertEqual(self.request("GET", "/1?utm=x")[1], "https://a.com/")
 
     def test_many_urls_grow_the_table(self):
         for i in range(30):
